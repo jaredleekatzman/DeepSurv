@@ -455,7 +455,7 @@ class DeepSurv:
         return lasagne.layers.get_output(self.network,
                                         deterministic = deterministic)
 
-    def calculate_risk(self, x):
+    def predict_risk(self, x):
         """
         Calculates the predicted risk for an array of observations.
 
@@ -495,10 +495,50 @@ class DeepSurv:
 
         # Calculate risk of observations treatment i
         x_trt[:,0] = trt_i
-        h_i = self.calculate_risk(x_trt)
+        h_i = self.predict_risk(x_trt)
         # Risk of observations in treatment j
         x_trt[:,0] = trt_j;
-        h_j = self.calculate_risk(x_trt)
+        h_j = self.predict_risk(x_trt)
 
         rec_ij = h_i - h_j
         return rec_ij
+
+    def plot_risk_surface(self, data, i = 0, j = 1,
+        figsize = (6,4), x_lims = None, y_lims = None, c_lims = None):
+        """
+        Plots the predicted risk surface of the network with respect to two
+        observed covarites i and j.
+
+        Parameters:
+            data: (n,d) numpy array of observations of which to predict risk.
+            i: index of data to plot as axis 1
+            j: index of data to plot as axis 2
+            figsize: size of figure for matplotlib
+            x_lims: Optional. If provided, override default x_lims (min(x_i), max(x_i))
+            y_lims: Optional. If provided, override default y_lims (min(x_j), max(x_j))
+            c_lims: Optional. If provided, override default color limits.
+
+        Returns:
+            fig: matplotlib figure object. 
+        """
+        fig = plt.figure(figsize=figsize)
+        X = data[:,i]
+        Y = data[:,j]
+        Z = self.predict_risk(data)
+
+        if not x_lims is None:
+            x_lims = [np.round(np.min(X)), np.round(np.max(X))]
+        if not y_lims is None:
+            y_lims = [np.round(np.min(Y)), np.round(np.max(Y))]
+        if not c_lims is None:
+            c_lims = [np.round(np.min(Z)), np.round(np.max(Z))]
+
+        ax = plt.scatter(X,Y, c = Z, edgecolors = 'none', marker = '.')
+        ax.set_clim(*c_lims)
+        plt.colorbar()
+        plt.xlim(*x_lims)
+        plt.ylim(*y_lims)
+        plt.xlabel('$x_{%d}$' % i, fontsize=18)
+        plt.ylabel('$x_{%d}$' % j, fontsize=18)
+
+        return fig
