@@ -19,21 +19,37 @@ class DeepSurv:
     dropout = None,
     standardize = False,
     ):
+        """
+        This class implements and trains a DeepSurv model.
+
+        Parameters:
+            n_in: number of input nodes.
+            learning_rate: learning rate for training.
+            lr_decay: coefficient for Power learning rate decay.
+            L2_reg: coefficient for L2 weight decay regularization. Used to help
+                prevent the model from overfitting.
+            L1_reg: coefficient for L1 weight decay regularization
+            momentum: coefficient for momentum. Can be 0 or None to disable.
+            hidden_layer_sizes: a list of integers to determine the size of
+                each hidden layer.
+            activation: a lasagne activation class.
+                Default: lasagne.nonlinearities.rectify
+            batch_norm: True or False. Include batch normalization layers.
+            dropout: if not None or 0, the percentage of dropout to include
+                after each hidden layer. Default: None
+            standardize: True or False. Include standardization layer after
+                input layer.
+        """
 
         self.X = T.fmatrix('x')  # patients covariates
         self.E = T.ivector('e') # the observations vector
 
-        # self.offset = T.mean(self.X, axis = 0)
-        # self.scale = T.std(self.X, axis = 0)
-
-        # self.offset = T.fvector('offset')
-        # self.scale = T.fvector('scale')
-
+        # Default Standardization Values: mean = 0, std = 1
         self.offset = theano.shared(numpy.zeros(shape = n_in, dtype=numpy.float32))
         self.scale = theano.shared(numpy.ones(shape = n_in, dtype=numpy.float32))
 
         network = lasagne.layers.InputLayer(shape=(None,n_in),
-        input_var = self.X)
+            input_var = self.X)
 
         if standardize:
             network = lasagne.layers.standardize(network,self.offset,
@@ -46,6 +62,7 @@ class DeepSurv:
             if activation == lasagne.nonlinearities.rectify:
                 W_init = lasagne.init.GlorotUniform()
             else:
+                # TODO: implement other initializations
                 W_init = lasagne.init.GlorotUniform()
 
 
@@ -73,8 +90,8 @@ class DeepSurv:
                                                     trainable = True)
         self.hidden_layers = lasagne.layers.get_all_layers(self.network)[1:]
 
-
-        self.risk_score = T.exp(self.log_hr(deterministic = True))
+        # Relevant Functions
+        self.partial_hazard = T.exp(self.risk(deterministic = True)) # e^h(x)
 
         # Set Hyper-parameters:
         self.n_in = n_in
@@ -84,24 +101,72 @@ class DeepSurv:
         self.L1_reg = L1_reg
         self.momentum = momentum
 
-    def load_model(self, params):
-        lasagne.layers.set_all_param_values(self.network, params, trainable=True)
+    def _negative_log_likelihood(self, E, deterministic = False):
+        """Return the negative log-likelihood of the prediction
+            of this model under a given target distribution.
 
-    def log_hr(self,deterministic = False):
-        return lasagne.layers.get_output(self.network,
-                                        deterministic = deterministic)
+        .. math::
 
-    def get_loss_updates(self,
+            \sum_{i \in D}[F(x_i,\theta) - log(\sum_{j \in R_i} e^F(x_j,\theta))]
+                - \lambda P(\theta)
+
+        where:
+            D is the set of observed events
+            R_i is the set of examples that are still alive at time of death t_j
+            F(x,\theta) = log hazard rate
+            P(\theta) = regularization equation
+            \lamba = regularization coefficient
+
+        Note: We assume that there are no tied event times
+
+        Parameters:
+            E (n,): TensorVector that corresponds to a vector that gives the censor
+                variable for each example
+            deterministic: True or False. Determines if the output of the network
+                is calculated determinsitically.
+
+        Returns:
+            neg_likelihood: Theano expression that computes negative
+                partial Cox likelihood
+        """
+        risk = self.risk(deterministic)
+        hazard_ratio = T.exp(risk)
+        log_risk = T.log(T.extra_ops.cumsum(hazard_ratio))
+        uncensored_likelihood = risk.T - log_risk
+        censored_likelihood = uncensored_likelihood * E
+        neg_likelihood = -T.sum(censored_likelihood)
+        return neg_likelihood
+
+    def _get_loss_updates(self,
     L1_reg = 0.0, L2_reg = 0.001,
     update_fn = lasagne.updates.nesterov_momentum,
     max_norm = None, deterministic = False,
     **kwargs):
+        """
+        Returns Theano expressions for the network's loss function and parameter
+            updates.
+
+        Parameters:
+            L1_reg: float for L1 weight regularization coefficient.
+            L2_reg: float for L2 weight regularization coefficient.
+            max_norm: If not None, constraints the norm of gradients to be less
+                than max_norm.
+            deterministic: True or False. Determines if the output of the network
+                is calculated determinsitically.
+            update_fn: lasagne update function.
+                Default: Stochastic Gradient Descent with Nesterov momentum
+            **kwargs: additional parameters to provide to update_fn.
+                For example: momentum
+
+        Returns:
+            loss: Theano expression for a penalized negative log likelihood.
+            updates: Theano expression to update the parameters using update_fn.
+        """
 
         loss = (
-            self.negative_log_likelihood(self.E, deterministic)
+            self._negative_log_likelihood(self.E, deterministic)
             + regularize_layer_params(self.network,l1) * L1_reg
             + regularize_layer_params(self.network, l2) * L2_reg
-            # + L2_reg * self.L2_sqr()
         )
 
         if max_norm:
@@ -118,44 +183,29 @@ class DeepSurv:
 
         return loss, updates
 
-    def negative_log_likelihood(self, E, deterministic = False):
-        """Return the mean of the negative log-likelihood of the prediction
-        of this model under a given target distribution.
-
-        .. math::
-
-            \sum_{i \in D}[F(x_i,\theta) - log(\sum_{j \in R_i} e^F(x_j,\theta))]
-                - \lambda P(\theta)
-
-        where:
-            D is the set of observed events
-            R_i is the set of examples that are still alive at time of death t_j
-            F(x,\theta) = log hazard rate
-            P(\theta) = regularization equation
-            \lamba = regularization coefficient
-
-
-        :type E: theano.tensor.TensorType
-        :param E: corresponds to a vecotr that gives the censor variable for
-                  each example
-
-        Note: we assume that the training examples are sorted in order of E
-                (this is because we use the theano.cumsum function to get the
-                overall risk associated with an individual example)
-            Additionally, we assume that no patients die on the same day
-                (otherwise likelihood would be different)
-        """
-        log_hr = self.log_hr(deterministic)
-        hazard_ratio = T.exp(log_hr)
-        log_risk = T.log(T.extra_ops.cumsum(hazard_ratio))
-        uncensored_likelihood = log_hr.T - log_risk
-        censored_likelihood = uncensored_likelihood * E
-        return -T.sum(censored_likelihood)
-
-    def get_train_valid_fn(self,
+    def _get_train_valid_fn(self,
     L1_reg, L2_reg, learning_rate,
     **kwargs):
-        loss, updates = self.get_loss_updates(
+        """
+        Builds the loss and update Theano expressions into callable Theano functions.
+
+        Parameters:
+            L1_reg: coefficient for L1 weight decay regularization
+            L2_reg: coefficient for L2 weight decay regularization. Used to help
+                prevent the model from overfitting.
+            learning_rate: learning rate coefficient.
+            **kwargs: additional parameters to provide to _get_loss_updates.
+
+        Returns:
+            train_fn: Theano function that takes a (n, d) array and (n,) vector
+                and computes the loss function and updates the network parameters.
+                Calculated non-deterministically.
+            valid_fn: Theano function that takes a (n, d) array and (n,) vector
+                and computes the loss function without updating the network parameters.
+                Calcualted deterministically.
+        """
+
+        loss, updates = self._get_loss_updates(
             L1_reg, L2_reg, deterministic = False,
             learning_rate=learning_rate, **kwargs
         )
@@ -166,7 +216,7 @@ class DeepSurv:
             name = 'train'
         )
 
-        valid_loss, _ = self.get_loss_updates(
+        valid_loss, _ = self._get_loss_updates(
             L1_reg, L2_reg, deterministic = True,
             learning_rate=learning_rate, **kwargs
         )
@@ -178,9 +228,19 @@ class DeepSurv:
         )
         return train_fn, valid_fn
 
-    def get_concordance_index(self, data, true_survival, event_observed):
+    def get_concordance_index(self, x, t, e):
         """
-        Taken from the lifelines.utils package:
+        Taken from the lifelines.utils package. Docstring is provided below.
+
+        Parameters:
+            x: (n, d) numpy array of observations.
+            t: (n) numpy array representing observed time events.
+            e: (n) numpy array representing time indicators.
+
+        Returns:
+            concordance_index: calcualted using lifelines.utils.concordance_index
+
+        lifelines.utils.concordance index docstring:
 
         Calculates the concordance index (C-index) between two series
         of event times. The first is the real survival times from
@@ -201,23 +261,68 @@ class DeepSurv:
         """
         compute_hazards = theano.function(
             inputs = [self.X],
-            outputs = -self.risk_score
+            outputs = -self.partial_hazard
         )
-        partial_hazards = compute_hazards(data)
+        partial_hazards = compute_hazards(x)
 
-        return concordance_index(true_survival,
+        return concordance_index(t,
             partial_hazards,
-            event_observed)
+            e)
 
     def train(self,
     train_data, valid_data= None,
     standardize = True,
     n_epochs = 500,
-    validation_frequency = 10, improvement_threshold = 0.99999,
-    patience = 1000, patience_increase = 2,
-    update_fn = lasagne.updates.nesterov_momentum,
+    validation_frequency = 10,
+    patience = 1000, improvement_threshold = 0.99999, patience_increase = 2,
     verbose = True,
+    update_fn = lasagne.updates.nesterov_momentum,
     **kwargs):
+        """
+        Trains a DeepSurv network on the provided training data and evalutes
+            it on the validation data.
+
+        Parameters:
+            train_data: dictionary with the following keys:
+                'x' : (n,d) array of observations.
+                't' : (n) array of observed time events.
+                'e' : (n) array of observed time indicators.
+            valid_data: optional. A dictionary with the following keys:
+                'x' : (n,d) array of observations.
+                't' : (n) array of observed time events.
+                'e' : (n) array of observed time indicators.
+            standardize: True or False. Set the offset and scale of
+                standardization layey to the mean and standard deviation of the
+                training data.
+            n_epochs: integer for the maximum number of epochs the network will
+                train for.
+            validation_frequency: how often the network computes the validation
+                metrics. Decreasing validation_frequency increases training speed.
+            patience: minimum number of epochs to train for. Once patience is
+                reached, looks at validation improvement to increase patience or
+                early stop.
+            improvement_threshold: percentage of improvement needed to increase
+                patience.
+            patience_increase: multiplier to patience if threshold is reached.
+            verbose: True or False. Print additionally messages to stdout.
+            update_fn: lasagne update function for training.
+                Default: lasagne.updates.nesterov_momentum
+            **kwargs: additional parameters to provide _get_train_valid_fn.
+                Parameters used to provide configurations to update_fn.
+
+        Returns:
+            metrics: a dictionary of training metrics that include:
+                'train': a list of loss values for each training epoch
+                'train_ci': a list of C-indices for each training epoch
+                'best_params': a list of numpy arrays containing the parameters
+                    when the network had the best validation loss
+                'best_params_idx': the epoch at which best_params was found
+            If valid_data is provided, the metrics also contain:
+                'valid': a list of validation loss values for each validation frequency
+                'valid_ci': a list of validation C-indiices for each validation frequency
+                'best_validation_loss': the best validation loss found during training
+                'best_valid_ci': the max validation C-index found during training
+        """
         if verbose:
             print '[INFO] Training CoxMLP'
 
@@ -225,22 +330,16 @@ class DeepSurv:
         train_ci = []
         x_train, e_train, t_train = train_data['x'], train_data['e'], train_data['t']
 
-        # Sort Training Data
+        # Sort Training Data for Accurate Likelihood
         sort_idx = numpy.argsort(t_train)[::-1]
         x_train = x_train[sort_idx]
         e_train = e_train[sort_idx]
         t_train = t_train[sort_idx]
 
+        # Set Standardization layer offset and scale to training data mean and std
         if self.standardize:
             self.offset = x_train.mean(axis = 0)
             self.scale = x_train.std(axis = 0)
-        # else:
-            # self.offset = numpy.zeros_like(x_train[0,:], dtype = numpy.float32)
-            # self.scale = numpy.ones_like(x_train[0,:], dtype=numpy.float32)
-
-        # if standardize:
-        #     x_mean, x_std = x_train.mean(axis = 0), x_train.std(axis = 0)
-        #     x_train = (x_train - x_mean) / x_std
 
         if valid_data:
             valid_loss = []
@@ -253,19 +352,17 @@ class DeepSurv:
             e_valid = e_valid[sort_idx]
             t_valid = t_valid[sort_idx]
 
-            # if standardize:
-            #     x_valid = (x_valid - x_mean) / x_std
-
+        # Initialize Metrics
         best_validation_loss = numpy.inf
         best_params = None
         best_params_idx = -1
 
+        # Initialize Training Parameters
         lr = theano.shared(numpy.array(self.learning_rate,
                                     dtype = numpy.float32))
-
         momentum = numpy.array(0, dtype= numpy.float32)
 
-        train_fn, valid_fn = self.get_train_valid_fn(
+        train_fn, valid_fn = self._get_train_valid_fn(
             L1_reg=self.L1_reg, L2_reg=self.L2_reg,
             learning_rate=lr,
             momentum = momentum,
@@ -313,23 +410,95 @@ class DeepSurv:
             if patience <= epoch:
                 break
 
-            if epoch % 50 == 0:
-                print_progressbar(epoch, n_epochs, verbose = verbose)
-
-        print('Finished Training with %d iterations in %0.2fs' % (
-            epoch + 1, time.time() - start
-        ))
+        if verbose:
+            print('Finished Training with %d iterations in %0.2fs' % (
+                epoch + 1, time.time() - start
+            ))
 
         metrics = {
             'train': train_loss,
             'best_params': best_params,
             'best_params_idx' : best_params_idx,
-            'best_validation_loss':best_validation_loss,
             'train_ci' : train_ci
         }
         if valid_data:
-            metrics ['valid'] = valid_loss
-            metrics['valid_ci'] = valid_ci
-            metrics['best_valid_ci'] = max(valid_ci)
+            metrics.update({
+                'valid' : valid_loss,
+                'valid_ci': valid_ci,
+                'best_valid_ci': max(valid_ci),
+                'best_validation_loss':best_validation_loss
+            })
 
         return metrics
+
+    def load_model(self, params):
+        """
+        Loads the network's parameters from a previously saved state.
+
+        Parameters:
+            params: a list of parameters in same order as network.params
+        """
+        lasagne.layers.set_all_param_values(self.network, params, trainable=True)
+
+    def risk(self,deterministic = False):
+        """
+        Returns a theano expression for the output of network which is an
+            observation's predicted risk.
+
+        Parameters:
+            deterministic: True or False. Determines if the output of the network
+                is calculated determinsitically.
+
+        Returns:
+            risk: a theano expression representing a predicted risk h(x)
+        """
+        return lasagne.layers.get_output(self.network,
+                                        deterministic = deterministic)
+
+    def calculate_risk(self, x):
+        """
+        Calculates the predicted risk for an array of observations.
+
+        Parameters:
+            x: (n,d) numpy array of observations.
+
+        Returns:
+            risks: (n) array of predicted risks
+        """
+        risk_fxn = theano.function(
+            inputs = [network.X],
+            outputs = network.risk(deterministic= True),
+            name = 'predicted risk'
+        )
+        return risk_fxn(x)
+
+    def recommend_treatment(self, x, trt_i, trt_j):
+        """
+        Computes recommendation function rec_ij(x) for two treatments i and j.
+            rec_ij(x) is the log of the hazards ratio of x in treatment i vs.
+            treatment j.
+
+        .. math::
+
+            rec_{ij}(x) = log(e^h_i(x) / e^h_j(x)) = h_i(x) - h_j(x)
+
+        Parameters:
+            x: (n, d) numpy array of observations
+            trt_i: treatment i value
+            trt_j: treatment j value
+
+        Returns:
+            rec_ij: recommendation
+        """
+        # Copy x to prevent overwritting data
+        x_trt = np.copy(x)
+
+        # Calculate risk of observations treatment i
+        x_trt[:,0] = trt_i
+        h_i = self.calculate_risk(x_trt)
+        # Risk of observations in treatment j
+        x_trt[:,0] = trt_j;
+        h_j = self.calculate_risk(x_trt)
+
+        rec_ij = h_i - h_j
+        return rec_ij
