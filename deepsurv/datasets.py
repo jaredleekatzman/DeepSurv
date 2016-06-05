@@ -97,7 +97,7 @@ class SimulatedData:
         See:
         Peter C Austin. Generating survival times to simulate cox proportional
         hazards models with time-varying covariates. Statistics in medicine,
-        31(29):3946–3958, 2012.
+        31(29):3946-3958, 2012.
         """
 
         # Patient Baseline information

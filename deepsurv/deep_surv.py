@@ -11,12 +11,12 @@ from lasagne.regularization import regularize_layer_params, l1, l2
 
 class DeepSurv:
     def __init__(self, n_in,
-    learning_rate, lr_decay, L2_reg, L1_reg = 0.00,
-    momentum = 0.9,
-    hidden_layers_sizes = None,
+    learning_rate, hidden_layers_sizes = None,
+    lr_decay = 0.0, momentum = 0.9,
+    L2_reg = 0.0, L1_reg = 0.0,
     activation = lasagne.nonlinearities.rectify,
-    batch_norm = True,
     dropout = None,
+    batch_norm = False,
     standardize = False,
     ):
         """
@@ -228,7 +228,7 @@ class DeepSurv:
         )
         return train_fn, valid_fn
 
-    def get_concordance_index(self, x, t, e):
+    def get_concordance_index(self, x, t, e, **kwargs):
         """
         Taken from the lifelines.utils package. Docstring is provided below.
 
@@ -271,7 +271,6 @@ class DeepSurv:
 
     def train(self,
     train_data, valid_data= None,
-    standardize = True,
     n_epochs = 500,
     validation_frequency = 10,
     patience = 1000, improvement_threshold = 0.99999, patience_increase = 2,
@@ -284,9 +283,9 @@ class DeepSurv:
 
         Parameters:
             train_data: dictionary with the following keys:
-                'x' : (n,d) array of observations.
-                't' : (n) array of observed time events.
-                'e' : (n) array of observed time indicators.
+                'x' : (n,d) array of observations (dtype = float32).
+                't' : (n) array of observed time events (dtype = float32).
+                'e' : (n) array of observed time indicators (dtype = int32).
             valid_data: optional. A dictionary with the following keys:
                 'x' : (n,d) array of observations.
                 't' : (n) array of observed time events.
@@ -466,13 +465,13 @@ class DeepSurv:
             risks: (n) array of predicted risks
         """
         risk_fxn = theano.function(
-            inputs = [network.X],
-            outputs = network.risk(deterministic= True),
+            inputs = [self.X],
+            outputs = self.risk(deterministic= True),
             name = 'predicted risk'
         )
         return risk_fxn(x)
 
-    def recommend_treatment(self, x, trt_i, trt_j):
+    def recommend_treatment(self, x, trt_i, trt_j, trt_idx = -1):
         """
         Computes recommendation function rec_ij(x) for two treatments i and j.
             rec_ij(x) is the log of the hazards ratio of x in treatment i vs.
@@ -486,18 +485,19 @@ class DeepSurv:
             x: (n, d) numpy array of observations
             trt_i: treatment i value
             trt_j: treatment j value
+            trt_idx: the index of x representing the treatment group column
 
         Returns:
             rec_ij: recommendation
         """
         # Copy x to prevent overwritting data
-        x_trt = np.copy(x)
+        x_trt = numpy.copy(x)
 
         # Calculate risk of observations treatment i
-        x_trt[:,0] = trt_i
+        x_trt[:,trt_idx] = trt_i
         h_i = self.predict_risk(x_trt)
         # Risk of observations in treatment j
-        x_trt[:,0] = trt_j;
+        x_trt[:,trt_idx] = trt_j;
         h_j = self.predict_risk(x_trt)
 
         rec_ij = h_i - h_j
