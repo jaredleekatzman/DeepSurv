@@ -4,8 +4,8 @@ with open('README.txt') as file:
     long_description = file.read()
 
 setup(name='deepsurv',
-    version='1.0',
-    description='Deep Cox Proportional Hazards Network',
+    version='0.1.0',
+    description='Deep Cox Proportional Hazards Network for deep learning and survival analysis.',
     keywords = "survival analysis deep learning cox regression",
     url='https://github.com/jaredleekatzman/DeepSurv',
     author='Jared Katzman',
