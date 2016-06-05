@@ -25,6 +25,6 @@ setup(name='deepsurv',
         'lasagne',
         'lifelines',
     ],
-    test_suite = 'nose.collector',
-    test_require = ['nose','lasagne','theano']
+    # test_suite = 'nose.collector',
+    # test_require = ['nose','lasagne','theano']
 )
