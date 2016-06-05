@@ -2,8 +2,9 @@
 
 DeepSurv implements a deep learning generalization of the Cox proportional hazards model using Theano and Lasagne. 
 
-DeepSurv has an advantage over traditional Cox regression because it does not require an *a priori* selection of covariate interaction terms, but learns them adaptively. 
+DeepSurv has an advantage over traditional Cox regression because it does not require an *a priori* selection of covariates, but learns them adaptively. 
 
+DeepSurv can be used in numerous survival analysis applications. One medical application is provided: recommend_treatment, which provides treatment recommendations for a set of patient observations. 
 
 ## Installation:
 
@@ -51,6 +52,3 @@ You can then evaluate its success on testing data:
 If you have matplotlib installed, you can visualize the training and validation curves after training the network:
 
 	deepsurv.plot_log(log)
-
-
-
