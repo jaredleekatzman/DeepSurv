@@ -4,7 +4,6 @@ import matplotlib.pyplot as plt
 import theano
 import numpy as np
 
-
 def plot_log(log):
     """
     Plots the training and validation curves for a network's loss function

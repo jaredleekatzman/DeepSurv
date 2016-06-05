@@ -519,7 +519,7 @@ class DeepSurv:
             c_lims: Optional. If provided, override default color limits.
 
         Returns:
-            fig: matplotlib figure object. 
+            fig: matplotlib figure object.
         """
         fig = plt.figure(figsize=figsize)
         X = data[:,i]

@@ -1,9 +1,5 @@
 from math import log, exp
-import pandas as pd
 import numpy as np
-from sklearn.cross_validation import train_test_split
-import h5py
-from pandas import HDFStore
 
 class SimulatedData:
     def __init__(self, hr_ratio,
