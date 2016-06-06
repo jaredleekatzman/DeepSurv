@@ -6,6 +6,8 @@ DeepSurv has an advantage over traditional Cox regression because it does not re
 
 DeepSurv can be used in numerous survival analysis applications. One medical application is provided: recommend_treatment, which provides treatment recommendations for a set of patient observations. 
 
+For more details, see full paper [Deep Survival: A Deep Cox Proportional Hazards Network](http://arxiv.org/abs/1606.00931).
+
 ## Installation:
 
 ### Dependencies
