@@ -22,6 +22,14 @@ You can install *DeepSurv* using
 
 from the command line.
 
+#### Dependencies
+
+DeepSurv has been succesfully installed and tested on macOS Sierra 10.12.1 with the follow versions of Python packages:
+
+        'theano==0.8.2',
+        'lasagne==0.2.dev1',
+        'lifelines==0.9.2',
+
 ### Running the tests
 
 After installing, you can optionally run the test suite with

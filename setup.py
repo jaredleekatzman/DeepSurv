@@ -21,9 +21,9 @@ setup(name='deepsurv',
     ],
     packages=['deepsurv'],
     install_requires=[
-        'theano',
-        'lasagne',
-        'lifelines',
+        'theano==0.8.2',
+        'lasagne==0.2.dev1',
+        'lifelines==0.9.2',
     ],
     # test_suite = 'nose.collector',
     # test_require = ['nose','lasagne','theano']
