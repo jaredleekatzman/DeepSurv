@@ -1,3 +1,5 @@
+from __future__ import print_function
+
 import lasagne
 import numpy
 import time
@@ -269,12 +271,25 @@ class DeepSurv:
             partial_hazards,
             e)
 
+    # @TODO: implement for varios instances of datasets
+    def prepare_data(self,dataset):
+        if isinstance(dataset, dict):
+            x, e, t = dataset['x'], dataset['e'], dataset['t']
+
+        # Sort Training Data for Accurate Likelihood
+        sort_idx = numpy.argsort(t)[::-1]
+        x = x[sort_idx]
+        e = e[sort_idx]
+        t = t[sort_idx]
+
+        return (x, e, t)
+
     def train(self,
     train_data, valid_data= None,
     n_epochs = 500,
     validation_frequency = 10,
     patience = 1000, improvement_threshold = 0.99999, patience_increase = 2,
-    verbose = True,
+    logger = None,
     update_fn = lasagne.updates.nesterov_momentum,
     **kwargs):
         """
@@ -303,7 +318,7 @@ class DeepSurv:
             improvement_threshold: percentage of improvement needed to increase
                 patience.
             patience_increase: multiplier to patience if threshold is reached.
-            verbose: True or False. Print additionally messages to stdout.
+            logger: None or DeepSurvLogger.
             update_fn: lasagne update function for training.
                 Default: lasagne.updates.nesterov_momentum
             **kwargs: additional parameters to provide _get_train_valid_fn.
@@ -322,18 +337,12 @@ class DeepSurv:
                 'best_validation_loss': the best validation loss found during training
                 'best_valid_ci': the max validation C-index found during training
         """
-        if verbose:
-            print '[INFO] Training CoxMLP'
 
-        train_loss = []
-        train_ci = []
-        x_train, e_train, t_train = train_data['x'], train_data['e'], train_data['t']
+        # @TODO? Should these be managed by the logger => then you can do logger.getMetrics
+        # train_loss = []
+        # train_ci = []
 
-        # Sort Training Data for Accurate Likelihood
-        sort_idx = numpy.argsort(t_train)[::-1]
-        x_train = x_train[sort_idx]
-        e_train = e_train[sort_idx]
-        t_train = t_train[sort_idx]
+        x_train, e_train, t_train = self.prepare_data(train_data)
 
         # Set Standardization layer offset and scale to training data mean and std
         if self.standardize:
@@ -341,20 +350,14 @@ class DeepSurv:
             self.scale = x_train.std(axis = 0)
 
         if valid_data:
-            valid_loss = []
-            valid_ci = []
-            x_valid, e_valid, t_valid = valid_data['x'], valid_data['e'], valid_data['t']
-
-            # Sort Validation Data
-            sort_idx = numpy.argsort(t_valid)[::-1]
-            x_valid = x_valid[sort_idx]
-            e_valid = e_valid[sort_idx]
-            t_valid = t_valid[sort_idx]
+            # valid_loss = []
+            # valid_ci = []
+            x_valid, e_valid, t_valid = self.prepare_data(valid_data)
 
         # Initialize Metrics
         best_validation_loss = numpy.inf
-        best_params = None
-        best_params_idx = -1
+        # best_params = None
+        # best_params_idx = -1
 
         # Initialize Training Parameters
         lr = theano.shared(numpy.array(self.learning_rate,
@@ -369,7 +372,10 @@ class DeepSurv:
         )
 
         start = time.time()
-        for epoch in xrange(n_epochs):
+        for epoch in range(n_epochs):
+            if logger and (epoch % validation_frequency == 0):
+                logger.print_progress_bar(epoch, n_epochs)
+
             # Power-Learning Rate Decay
             lr = self.learning_rate / (1 + epoch * self.lr_decay)
 
@@ -377,59 +383,65 @@ class DeepSurv:
                 momentum = self.momentum
 
             loss = train_fn(x_train, e_train)
-            train_loss.append(loss)
+
+            logger.logValue('loss', loss, epoch)
+            # train_loss.append(loss)
 
             ci_train = self.get_concordance_index(
                 x_train,
                 t_train,
                 e_train,
             )
-            train_ci.append(ci_train)
+            logger.logValue('c-index',ci_train, epoch)
+            # train_ci.append(ci_train)
 
             if valid_data and (epoch % validation_frequency == 0):
                 validation_loss = valid_fn(x_valid, e_valid)
-                valid_loss.append(validation_loss)
+                logger.logValue('valid_loss',validation_loss, epoch)
 
                 ci_valid = self.get_concordance_index(
                     x_valid,
                     t_valid,
                     e_valid
                 )
-                valid_ci.append(ci_valid)
+                logger.logValue('valid_c-index', ci_valid, epoch)
 
                 if validation_loss < best_validation_loss:
                     # improve patience if loss improves enough
                     if validation_loss < best_validation_loss * improvement_threshold:
                         patience = max(patience, epoch * patience_increase)
 
-                    best_params = [param.copy().eval() for param in self.params]
-                    best_params_idx = epoch
+                    # best_params = [param.copy().eval() for param in self.params]
+                    # best_params_idx = epoch
                     best_validation_loss = validation_loss
 
             if patience <= epoch:
                 break
 
-        if verbose:
-            print('Finished Training with %d iterations in %0.2fs' % (
+        if logger:
+            logger.logMessage('Finished Training with %d iterations in %0.2fs' % (
                 epoch + 1, time.time() - start
             ))
 
-        metrics = {
-            'train': train_loss,
-            'best_params': best_params,
-            'best_params_idx' : best_params_idx,
-            'train_ci' : train_ci
-        }
-        if valid_data:
-            metrics.update({
-                'valid' : valid_loss,
-                'valid_ci': valid_ci,
-                'best_valid_ci': max(valid_ci),
-                'best_validation_loss':best_validation_loss
-            })
+        # Return Logger.getMetrics()
+        # metrics = {
+        #     'train': train_loss,
+        #     'best_params': best_params,
+        #     'best_params_idx' : best_params_idx,
+        #     'train_ci' : train_ci
+        # }
+        # if valid_data:
+        #     metrics.update({
+        #         'valid' : valid_loss,
+        #         'valid_ci': valid_ci,
+        #         'best_valid_ci': max(valid_ci),
+        #         'best_validation_loss':best_validation_loss
+        #     })
 
-        return metrics
+        return logger.history
 
+    # @TODO need to reimplement with it working
+    # @TODO need to add save_model
     def load_model(self, params):
         """
         Loads the network's parameters from a previously saved state.

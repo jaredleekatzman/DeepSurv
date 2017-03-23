@@ -106,7 +106,7 @@ class SimulatedData:
 
         if self.treatment_group:
             data[:,-1] = np.squeeze(np.random.randint(0,2,(N,1)))
-            print data[:,-1]
+            print(data[:,-1])
 
         # Each patient has a uniform death probability
         p_death = self.average_death * np.ones((N,1))
@@ -129,7 +129,7 @@ class SimulatedData:
         # Generate time of death for each patient
         # currently exponential random variable
         death_time = np.zeros((N,1))
-        for i in xrange(N):
+        for i in range(N):
             if self.treatment_group and data[i,-1] == 0:
                 death_time[i] = np.random.exponential(p_death[i])
             else:
