@@ -9,11 +9,13 @@ class DeepSurvLogger():
 	def logMessage(self,message):
 		self.logger.info(message)
 
-	def print_progress_bar(self, step, max_steps, bar_length = 50, char = '*'):
+	def print_progress_bar(self, step, max_steps, loss = None, bar_length = 25, char = '*', ):
 		progress_length = int(bar_length * step / max_steps)
 		progress_bar = [char] * (progress_length) + [' '] * (bar_length - progress_length)
-		self.logger.info("Training step %d/%d |" % (step, max_steps)
-			+ ''.join(progress_bar) + "|")
+		message = "Training step %d/%d |" % (step, max_steps) + ''.join(progress_bar) + "|"
+		if loss:
+			message += " - loss: %.4f" % loss
+		self.logger.info(message)
 
 
 class TensorboardLogger(DeepSurvLogger):

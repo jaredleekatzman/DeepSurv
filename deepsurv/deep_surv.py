@@ -3,6 +3,8 @@ from __future__ import print_function
 import lasagne
 import numpy
 import time
+import json
+import h5py
 
 import theano
 import theano.tensor as T
@@ -16,7 +18,7 @@ class DeepSurv:
     learning_rate, hidden_layers_sizes = None,
     lr_decay = 0.0, momentum = 0.9,
     L2_reg = 0.0, L1_reg = 0.0,
-    activation = lasagne.nonlinearities.rectify,
+    activation = "rectify",
     dropout = None,
     batch_norm = False,
     standardize = False,
@@ -59,9 +61,14 @@ class DeepSurv:
                                                 shared_axes = 0)
         self.standardize = standardize
 
+        if activation == 'rectify':
+            activation_fn = lasagne.nonlinearities.rectify
+        else:
+            raise IllegalArgumentException("Unknown activation function: %s" % activation)
+
         # Construct Neural Network
         for n_layer in (hidden_layers_sizes or []):
-            if activation == lasagne.nonlinearities.rectify:
+            if activation_fn == lasagne.nonlinearities.rectify:
                 W_init = lasagne.init.GlorotUniform()
             else:
                 # TODO: implement other initializations
@@ -70,7 +77,7 @@ class DeepSurv:
 
             network = lasagne.layers.DenseLayer(
                 network, num_units = n_layer,
-                nonlinearity = activation,
+                nonlinearity = activation_fn,
                 W = W_init
             )
 
@@ -95,7 +102,21 @@ class DeepSurv:
         # Relevant Functions
         self.partial_hazard = T.exp(self.risk(deterministic = True)) # e^h(x)
 
-        # Set Hyper-parameters:
+        # Store and set needed Hyper-parameters:
+        self.hyperparams = {
+            'n_in': n_in,
+            'learning_rate': learning_rate,
+            'hidden_layers_sizes': hidden_layers_sizes,
+            'lr_decay': lr_decay,
+            'momentum': momentum,
+            'L2_reg': L2_reg,
+            'L1_reg': L1_reg,
+            'activation': activation,
+            'dropout': dropout,
+            'batch_norm': batch_norm,
+            'standardize': standardize
+        }
+
         self.n_in = n_in
         self.learning_rate = learning_rate
         self.lr_decay = lr_decay
@@ -182,6 +203,9 @@ class DeepSurv:
         updates = update_fn(
                 loss, self.params, **kwargs
             )
+
+        # Store last update function
+        self.updates = updates
 
         return loss, updates
 
@@ -373,9 +397,6 @@ class DeepSurv:
 
         start = time.time()
         for epoch in range(n_epochs):
-            if logger and (epoch % validation_frequency == 0):
-                logger.print_progress_bar(epoch, n_epochs)
-
             # Power-Learning Rate Decay
             lr = self.learning_rate / (1 + epoch * self.lr_decay)
 
@@ -415,6 +436,9 @@ class DeepSurv:
                     # best_params_idx = epoch
                     best_validation_loss = validation_loss
 
+            if logger and (epoch % validation_frequency == 0):
+                logger.print_progress_bar(epoch, n_epochs, loss)
+
             if patience <= epoch:
                 break
 
@@ -440,16 +464,71 @@ class DeepSurv:
 
         return logger.history
 
-    # @TODO need to reimplement with it working
-    # @TODO need to add save_model
-    def load_model(self, params):
-        """
-        Loads the network's parameters from a previously saved state.
+    def to_json(self):
+        return json.dumps(self.hyperparams)
 
-        Parameters:
-            params: a list of parameters in same order as network.params
-        """
-        lasagne.layers.set_all_param_values(self.network, params, trainable=True)
+    def save_model(self, filename, weights_file = None):
+        with open(filename, 'w') as fp:
+            fp.write(self.to_json())
+
+        if weights_file:
+            self.save_weights(weights_file)
+
+    # # @TODO need to reimplement with it working
+    # # @TODO need to add save_model
+    # def load_model(self, params):
+    #     """
+    #     Loads the network's parameters from a previously saved state.
+
+    #     Parameters:
+    #         params: a list of parameters in same order as network.params
+    #     """
+    #     lasagne.layers.set_all_param_values(self.network, params, trainable=True)
+
+    def save_weights(self,filename):
+        def save_list_by_idx(group, lst):
+            for (idx, param) in enumerate(lst):
+                group.create_dataset(str(idx), data=param)
+
+        weights_out = lasagne.layers.get_all_param_values(self.network, trainable=False)
+        updates_out = [p.get_value() for p in self.updates.keys()]
+
+        # Store all of the parameters in an hd5f file
+        # We store the parameter under the index in the list
+        # so that when we read it later, we can construct the list of
+        # parameters in the same order they were saved
+        with h5py.File(filename, 'w') as f_out:
+            weights_grp = f_out.create_group('weights')
+            save_list_by_idx(weights_grp, weights_out)
+
+            updates_grp = f_out.create_group('updates')
+            save_list_by_idx(updates_grp, updates_out)
+
+    def load_weights(self, filename):
+        def load_all_keys(fp):
+            results = []
+            for key in fp:
+                dataset = fp[key][:]
+                results.append((int(key), dataset))
+            return results
+
+        def sort_params_by_idx(params):
+            return [param for (idx, param) in sorted(params, 
+            key=lambda param: param[0])]
+
+        # Load all of the parameters
+        with h5py.File(filename, 'r') as f_in:
+            weights_in = load_all_keys(f_in['weights'])
+            updates_in = load_all_keys(f_in['updates'])
+
+        # Sort them according to the idx to ensure they are set correctly
+        sorted_weights_in = sort_params_by_idx(weights_in)
+        lasagne.layers.set_all_param_values(self.network, sorted_weights_in, 
+            trainable=False)
+
+        sorted_updates_in = sort_params_by_idx(updates_in)
+        for p, value in zip(self.updates.keys(), sorted_updates_in):
+            p.set_value(value)
 
     def risk(self,deterministic = False):
         """
@@ -554,3 +633,15 @@ class DeepSurv:
         plt.ylabel('$x_{%d}$' % j, fontsize=18)
 
         return fig
+
+def load_model_from_json(model_fp, weights_fp = None):
+    with open(model_fp, 'r') as fp:
+        json_model = fp.read()
+    hyperparams = json.loads(json_model)
+
+    model = DeepSurv(**hyperparams)
+
+    if weights_fp:
+        model.load_weights(weights_fp)
+
+    return model
