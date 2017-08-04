@@ -1,3 +1,7 @@
+'''
+Utility functions for running DeepSurv experiments
+'''
+
 import h5py
 import scipy.stats as st
 from collections import defaultdict
@@ -69,10 +73,11 @@ def calculate_recs_and_antirecs(rec_trt, true_trt, dataset, print_metrics=True):
     if isinstance(true_trt, int):
         true_trt = dataset['x'][:,true_trt]
 
-    trt_values = zip(np.sort(np.unique(rec_trt)),np.sort(np.unique(true_trt)))
+    # trt_values = zip([0,1],np.sort(np.unique(true_trt)))
+    trt_values = enumerate(np.sort(np.unique(true_trt)))
     equal_trt = [np.logical_and(rec_trt == rec_value, true_trt == true_value) for (rec_value, true_value) in trt_values]
     rec_idx = np.logical_or(*equal_trt)
-
+    # original Logic
     # rec_idx = np.logical_or(np.logical_and(rec_trt == 1,true_trt == 1),
     #               np.logical_and(rec_trt == 0,true_trt == 0))
 

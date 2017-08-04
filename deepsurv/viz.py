@@ -1,3 +1,8 @@
+'''
+Utility functions for visualizing results of DeepSurv experiments
+'''
+
+
 import matplotlib
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_pdf import PdfPages
@@ -68,7 +73,7 @@ def plot_log(log):
     plt.ylabel('Concordance Index')
     plt.legend(handles = handles, loc = 4)
 
-def plot_risk_model(x_0, x_1, hr, figsize=(4,3), clim = (-3,3)):
+def plot_risk_model(x_0, x_1, hr, figsize=(4,3), clim = (-3,3), cmap = 'jet'):
     fig, ax = plt.subplots(figsize=figsize)
     plt.xlim(-1, 1)
     plt.xlabel('$x_0$', fontsize='large')
@@ -78,20 +83,21 @@ def plot_risk_model(x_0, x_1, hr, figsize=(4,3), clim = (-3,3)):
     plt.ylabel('$x_1$', fontsize='large')
     plt.yticks(np.arange(-1, 1.5, .5))
     
-    im = plt.scatter(x=x_0, y=x_1, c=hr, marker='.', cmap='jet')
+    im = plt.scatter(x=x_0, y=x_1, c=hr, marker='.', cmap=cmap)
     fig.colorbar(im)
     # plt.clim(0, 1)
     plt.clim(*clim)
+    plt.tight_layout()
     return (fig, ax, im)
 
 def save_fig(fig, fp):
     # TODO fit the pdf saving cutting off the x and y axis labels
     pp_true = PdfPages(fp)
-    pp_true.savefig(fig, format="eps", dpi=600)
+    pp_true.savefig(fig, dpi=600)
     pp_true.close()
 
 def plot_experiment_scatters(risk_fxn, dataset, norm_vals = None, output_file=None, 
-    figsize = (4,3), clim=(-3,3), plot_error=False, trt_idx = None):
+    figsize = (4,3), clim=(-3,3), cmap = 'jet', plot_error=False, trt_idx = None):
     
     def norm_hr(hr):
         # return hr
@@ -115,14 +121,14 @@ def plot_experiment_scatters(risk_fxn, dataset, norm_vals = None, output_file=No
             x_trt[:,trt_idx] = trt_value
             hr_trt = risk_fxn(x_trt)
             hr_trt = norm_hr(hr_trt)
-            fig_trt, _, _ = plot_risk_model(x_0, x_1, hr_trt, figsize, clim)
+            fig_trt, _, _ = plot_risk_model(x_0, x_1, hr_trt, figsize, clim, cmap)
 
             if output_file:
                 save_fig(fig_trt, os.path.join(head, "treatment_%d_" % idx + tail))
     else:
         hr_pred = risk_fxn(x)
         hr_pred = norm_hr(hr_pred)
-        fig_pred, _, _ = plot_risk_model(x_0, x_1, hr_pred, figsize, clim)
+        fig_pred, _, _ = plot_risk_model(x_0, x_1, hr_pred, figsize, clim, cmap)
 
         if output_file:
             save_fig(fig_pred, os.path.join(head, "pred_" + tail))
@@ -130,14 +136,14 @@ def plot_experiment_scatters(risk_fxn, dataset, norm_vals = None, output_file=No
     if 'hr' in dataset:
         hr_true = dataset['hr']
         hr_true = norm_hr(hr_true)
-        fig_true, _, _ = plot_risk_model(x_0, x_1, hr_true, figsize, clim)
+        fig_true, _, _ = plot_risk_model(x_0, x_1, hr_true, figsize, clim, cmap)
 
         if output_file:
             save_fig(fig_true, os.path.join(head, "true_" + tail))
 
         if plot_error:
             hr_error = np.abs(hr_true - hr_pred)
-            fig_error, _, _ = plot_risk_model(x_0, x_1, hr_error, figsize, clim=(0,20))
+            fig_error, _, _ = plot_risk_model(x_0, x_1, hr_error, figsize, clim=(0,20), cmap = cmap)
 
             if output_file:
                 save_fig(fig_error, os.path.join(head, "error_" + tail))
@@ -162,8 +168,14 @@ def plot_survival_curves(rec_t, rec_e, antirec_t, antirec_e, experiment_name = '
     # Calculate p-value
     results = logrank_test(rec_t, antirec_t, rec_e, antirec_e, alpha=.95)
     results.print_summary()
-    ax.text(40,.2,'$p=%f$' % results.p_value,fontsize=20,)
-    plt.legend(loc='upper right',prop={'size':15})
+
+    # Location the label at the 1st out of 9 tick marks
+    xloc = max(np.max(rec_t),np.max(antirec_t)) / 9
+    if results.p_value < 1e-5:
+        ax.text(xloc,.2,'$p < 1\mathrm{e}{-5}$',fontsize=20)
+    else:
+        ax.text(xloc,.2,'$p=%f$' % results.p_value,fontsize=20)
+    plt.legend(loc='best',prop={'size':15})
 
 
     if output_file:
