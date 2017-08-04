@@ -12,12 +12,11 @@ RUN \
 
 COPY . /
 
-# TODO parameterize
-
-CMD [ "python", "-u", "./hyperparam_search.py", \
+CMD [ "python", "-u", "/hyperparam_search.py", \
 "/shared/logs", \
-"dataset", gaussian", \
-"box", "./box_constraints.0.json", \
- "num_evals", 100", \
- "--num_epochs", "500", \
- "--num_fold", "3" ]
+"gaussian", \
+"/box_constraints.0.json", \
+"100", \
+"--update_fn", "adam", \
+"--num_epochs", "500", \
+"--num_fold", "3" ]

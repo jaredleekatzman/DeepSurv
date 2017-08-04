@@ -1,5 +1,5 @@
 hp_search:
-  build: ./
+  build: .
   volumes:
-    - ../DeepSurv/:/DeepSurv
+    - ../deepsurv/:/deepsurv
     - ./logs:/shared/logs

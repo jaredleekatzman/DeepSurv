@@ -1,6 +1,6 @@
 # We provide the docker container with a local copy of the DeepSurv module at /DeepSurv/deepsurv
 import sys, os
-sys.path.append('/DeepSurv/deepsurv')
+sys.path.append('/deepsurv')
 
 import deep_surv
 import datasets
@@ -56,15 +56,15 @@ def load_dataset(dataset):
     '''
     ## Define internal functions
     def format_to_optunity(dataset, strata=False):
-    '''
-    Formats a dataset dictionary containing survival data with keys: 
-        { 
-            'x' : baseline data
-            'e' : censor
-            't' : event time
-        }
-    to a format that Optunity can use to run hyper-parameter searches on.
-    '''
+        '''
+        Formats a dataset dictionary containing survival data with keys: 
+            { 
+                'x' : baseline data
+                'e' : censor
+                't' : event time
+            }
+        to a format that Optunity can use to run hyper-parameter searches on.
+        '''
         x = dataset['x']
         e = dataset['e']
         t = dataset['t']
