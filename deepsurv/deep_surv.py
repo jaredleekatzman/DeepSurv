@@ -11,6 +11,8 @@ import theano.tensor as T
 
 from lifelines.utils import concordance_index
 
+from deepsurv_logger import DeepSurvLogger
+
 from lasagne.regularization import regularize_layer_params, l1, l2
 
 class DeepSurv:
@@ -49,20 +51,25 @@ class DeepSurv:
         self.E = T.ivector('e') # the observations vector
 
         # Default Standardization Values: mean = 0, std = 1
-        self.offset = theano.shared(numpy.zeros(shape = n_in, dtype=numpy.float32))
-        self.scale = theano.shared(numpy.ones(shape = n_in, dtype=numpy.float32))
+        self.offset = numpy.zeros(shape = n_in, dtype=numpy.float32)
+        self.scale = numpy.ones(shape = n_in, dtype=numpy.float32)
+
+        # self.offset = theano.shared(numpy.zeros(shape = n_in, dtype=numpy.float32))
+        # self.scale = theano.shared(numpy.ones(shape = n_in, dtype=numpy.float32))
 
         network = lasagne.layers.InputLayer(shape=(None,n_in),
             input_var = self.X)
 
-        if standardize:
-            network = lasagne.layers.standardize(network,self.offset,
-                                                self.scale,
-                                                shared_axes = 0)
+        # if standardize:
+        #     network = lasagne.layers.standardize(network,self.offset,
+        #                                         self.scale,
+        #                                         shared_axes = 0)
         self.standardize = standardize
 
         if activation == 'rectify':
             activation_fn = lasagne.nonlinearities.rectify
+        elif activation == 'selu':
+            activation_fn = lasagne.nonlinearities.selu
         else:
             raise IllegalArgumentException("Unknown activation function: %s" % activation)
 
@@ -73,7 +80,6 @@ class DeepSurv:
             else:
                 # TODO: implement other initializations
                 W_init = lasagne.init.GlorotUniform()
-
 
             network = lasagne.layers.DenseLayer(
                 network, num_units = n_layer,
@@ -123,6 +129,7 @@ class DeepSurv:
         self.L2_reg = L2_reg
         self.L1_reg = L1_reg
         self.momentum = momentum
+        self.restored_update_params = None
 
     def _negative_log_likelihood(self, E, deterministic = False):
         """Return the negative log-likelihood of the prediction
@@ -164,6 +171,7 @@ class DeepSurv:
     L1_reg = 0.0, L2_reg = 0.001,
     update_fn = lasagne.updates.nesterov_momentum,
     max_norm = None, deterministic = False,
+    momentum = 0.9,
     **kwargs):
         """
         Returns Theano expressions for the network's loss function and parameter
@@ -196,13 +204,16 @@ class DeepSurv:
             grads = T.grad(loss,self.params)
             scaled_grads = lasagne.updates.total_norm_constraint(grads, max_norm)
             updates = update_fn(
-                grads, self.params, **kwargs
+                scaled_grads, self.params, **kwargs
             )
-            return loss, updates
-
-        updates = update_fn(
+        else:
+            updates = update_fn(
                 loss, self.params, **kwargs
             )
+
+        if momentum:
+            updates = lasagne.updates.apply_nesterov_momentum(updates, 
+                self.params, self.learning_rate, momentum=momentum)
 
         # If the model was loaded from file, reload params
         if self.restored_update_params:
@@ -301,10 +312,16 @@ class DeepSurv:
             partial_hazards,
             e)
 
+    def _standardize_x(self, x):
+        return (x - self.offset) / self.scale
+
     # @TODO: implement for varios instances of datasets
     def prepare_data(self,dataset):
         if isinstance(dataset, dict):
             x, e, t = dataset['x'], dataset['e'], dataset['t']
+
+        if self.standardize:
+            x = self._standardize_x(x)
 
         # Sort Training Data for Accurate Likelihood
         sort_idx = numpy.argsort(t)[::-1]
@@ -317,10 +334,11 @@ class DeepSurv:
     def train(self,
     train_data, valid_data= None,
     n_epochs = 500,
-    validation_frequency = 10,
-    patience = 1000, improvement_threshold = 0.99999, patience_increase = 2,
+    validation_frequency = 250,
+    patience = 2000, improvement_threshold = 0.99999, patience_increase = 2,
     logger = None,
     update_fn = lasagne.updates.nesterov_momentum,
+    verbose = True,
     **kwargs):
         """
         Trains a DeepSurv network on the provided training data and evalutes
@@ -367,22 +385,23 @@ class DeepSurv:
                 'best_validation_loss': the best validation loss found during training
                 'best_valid_ci': the max validation C-index found during training
         """
-
-        # @TODO? Should these be managed by the logger => then you can do logger.getMetrics
-        x_train, e_train, t_train = self.prepare_data(train_data)
+        if logger is None:
+            logger = DeepSurvLogger('DeepSurv')
 
         # Set Standardization layer offset and scale to training data mean and std
         if self.standardize:
-            self.offset = x_train.mean(axis = 0)
-            self.scale = x_train.std(axis = 0)
+            self.offset = train_data['x'].mean(axis = 0)
+            self.scale = train_data['x'].std(axis = 0)
+
+        x_train, e_train, t_train = self.prepare_data(train_data)
 
         if valid_data:
             x_valid, e_valid, t_valid = self.prepare_data(valid_data)
 
         # Initialize Metrics
         best_validation_loss = numpy.inf
-        # best_params = None
-        # best_params_idx = -1
+        best_params = None
+        best_params_idx = -1
 
         # Initialize Training Parameters
         lr = theano.shared(numpy.array(self.learning_rate,
@@ -400,6 +419,7 @@ class DeepSurv:
         for epoch in range(n_epochs):
             # Power-Learning Rate Decay
             lr = self.learning_rate / (1 + epoch * self.lr_decay)
+            logger.logValue('lr', lr, epoch)
 
             if self.momentum and epoch >= 10:
                 momentum = self.momentum
@@ -433,20 +453,21 @@ class DeepSurv:
                     if validation_loss < best_validation_loss * improvement_threshold:
                         patience = max(patience, epoch * patience_increase)
 
-                    # best_params = [param.copy().eval() for param in self.params]
-                    # best_params_idx = epoch
+                    best_params = [param.copy().eval() for param in self.params]
+                    best_params_idx = epoch
                     best_validation_loss = validation_loss
 
-            if logger and (epoch % validation_frequency == 0):
-                logger.print_progress_bar(epoch, n_epochs, loss)
+            if verbose and (epoch % validation_frequency == 0):
+                logger.print_progress_bar(epoch, n_epochs, loss, ci_train)
 
             if patience <= epoch:
                 break
 
-        if logger:
+        if verbose:
             logger.logMessage('Finished Training with %d iterations in %0.2fs' % (
                 epoch + 1, time.time() - start
             ))
+        logger.shutdown()
 
         # Return Logger.getMetrics()
         # metrics = {
@@ -462,6 +483,9 @@ class DeepSurv:
         #         'best_valid_ci': max(valid_ci),
         #         'best_validation_loss':best_validation_loss
         #     })
+        logger.history['best_valid_loss'] = best_validation_loss
+        logger.history['best_params'] = best_params
+        logger.history['best_params_idx'] = best_params_idx
 
         return logger.history
 
@@ -629,6 +653,7 @@ class DeepSurv:
 def load_model_from_json(model_fp, weights_fp = None):
     with open(model_fp, 'r') as fp:
         json_model = fp.read()
+    print('Loading json model:',json_model)
     hyperparams = json.loads(json_model)
 
     model = DeepSurv(**hyperparams)

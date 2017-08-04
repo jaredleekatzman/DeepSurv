@@ -1,3 +1,4 @@
 *.pyc
 *.egg-info
 *.iml
+**/.DS_STORE
