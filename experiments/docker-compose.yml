@@ -1,0 +1,26 @@
+cph:
+  build: ./cph
+  dockerfile: Dockerfile.${EXPERIMENT}
+  volumes:
+    - ../deepsurv:/DeepSurv/deepsurv
+    - ./scripts:/scripts
+    - ./data/${EXPERIMENT}:/shared/data
+    - ./results/${EXPERIMENT}:/shared/results
+
+deepsurv:
+  build: ./deepsurv
+  dockerfile: Dockerfile.${EXPERIMENT}
+  volumes:
+    - ../deepsurv:/DeepSurv/deepsurv
+    - ./scripts:/scripts
+    - ./data/${EXPERIMENT}:/shared/data
+    - ./results/${EXPERIMENT}:/shared/results
+
+rsf:
+  build: ./rsf
+  dockerfile: Dockerfile.${EXPERIMENT}
+  volumes:
+    - ../deepsurv:/DeepSurv/deepsurv
+    - ./scripts:/scripts
+    - ./data/${EXPERIMENT}:/shared/data
+    - ./results/${EXPERIMENT}:/shared/results

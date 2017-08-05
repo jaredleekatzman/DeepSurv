@@ -1,0 +1,1 @@
+{"L2_reg": 2.8032470703125, "dropout": 0.0899951171875, "learning_rate": 0.023825980458515722, "lr_decay": 0.0005817382812499998, "momentum": 0.8383100585937501, "batch_norm": false, "activation": "selu", "standardize": true, "n_in": 6, "hidden_layers_sizes": [40, 40, 40]}
