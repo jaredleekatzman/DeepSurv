@@ -6,13 +6,13 @@ DeepSurv has an advantage over traditional Cox regression because it does not re
 
 DeepSurv can be used in numerous survival analysis applications. One medical application is provided: recommend_treatment, which provides treatment recommendations for a set of patient observations. 
 
-For more details, see full paper [Deep Survival: A Deep Cox Proportional Hazards Network](http://arxiv.org/abs/1606.00931).
+For more details, see full paper [DeepSurv: Personalized Treatment Recommender System Using A Cox Proportional Hazards Deep Neural Network](http://arxiv.org/abs/1606.00931).
 
 ## Installation:
 
 ### Dependencies
 
-Theano, Lasagne, lifelines, matplotlib (for visualization) and all of their respective dependencies. 
+Theano, Lasagne (bleeding edge version), lifelines, matplotlib (for visualization) and all of their respective dependencies. 
 
 ### Installing
 
@@ -62,3 +62,10 @@ You can then evaluate its success on testing data:
 If you have matplotlib installed, you can visualize the training and validation curves after training the network:
 
 	deepsurv.plot_log(log)
+
+## Running Experiments
+
+Experiments are run using Docker containers built off of the [floydhub](https://github.com/floydhub/dl-docker) deep learning Docker images. DeepSurv can be run on either the CPU or the GPU with nvidia-docker. 
+
+To run an experiment, define the experiment name as an environmental variable `EXPRIMENT`and run the docker-compose file. 	
+	
