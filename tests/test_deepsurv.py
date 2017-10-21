@@ -43,10 +43,6 @@ class TestDeepSurvInit():
         network = DeepSurv(dropout = 0.5, **self.hyperparams)
         assert len(network.hidden_layers) == 2 * len(self.hidden_layers_sizes) + 1
 
-    def test_deepsurv_initialize_standardize_layer(self):
-        network = DeepSurv(standardize = True, **self.hyperparams)
-        assert len(network.hidden_layers) == len(self.hidden_layers_sizes) + 3
-
 class TestDeepSurvTrain():
 
     @classmethod
@@ -65,12 +61,10 @@ class TestDeepSurvTrain():
         self.network = network
 
     def test_train(self):
-        # Test if network computes nan for any values
-        assert self.log.has_key('train') == True
-        assert numpy.any(numpy.isnan(self.log['train'])) == False
-
-        assert self.log.has_key('valid') == True
-        assert numpy.any(numpy.isnan(self.log['valid'])) == False
+        # Test if network has undefined parameters
+        assert self.log.has_key('best_params') == True
+        params_is_nan = [is_nan for params in self.log['best_params'] for is_nan in numpy.isnan(params.flatten())]
+        assert numpy.any(params_is_nan) == False
 
     def test_network_predict_risk(self):
         risk = self.network.predict_risk(self.test['x'])

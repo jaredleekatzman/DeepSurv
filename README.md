@@ -10,25 +10,17 @@ For more details, see full paper [DeepSurv: Personalized Treatment Recommender S
 
 ## Installation:
 
+### From source
+
+Download a local copy of DeepSurv and install from the directory:
+
+	git clone https://github.com/jaredleekatzman/DeepSurv.git
+	cd DeepSurv
+	pip install .
+
 ### Dependencies
 
-Theano, Lasagne (bleeding edge version), lifelines, matplotlib (for visualization) and all of their respective dependencies. 
-
-### Installing
-
-You can install *DeepSurv* using
-
-	pip install deepsurv
-
-from the command line.
-
-#### Dependencies
-
-DeepSurv has been succesfully installed and tested on macOS Sierra 10.12.1 with the follow versions of Python packages:
-
-        'theano==0.8.2',
-        'lasagne==0.2.dev1',
-        'lifelines==0.9.2',
+Theano, Lasagne (bleeding edge version), lifelines, matplotlib (for visualization), tensorboard_logger, and all of their respective dependencies. 
 
 ### Running the tests
 
@@ -36,7 +28,15 @@ After installing, you can optionally run the test suite with
 
 	py.test
 
-from the command line while in the module main directory.
+from the command line while in the repo's main directory. 
+
+## Running Experiments
+
+Experiments are run using Docker containers built off of the [floydhub](https://github.com/floydhub/dl-docker) deep learning Docker images. DeepSurv can be run on either the CPU or the GPU with nvidia-docker. 
+
+All experiments are in the `DeepSurv/experiments/` directory. 
+
+To run an experiment, define the experiment name as an environmental variable `EXPRIMENT`and run the docker-compose file. Further details are in the `DeepSurv/experiments/` directory. 
 
 ## Training a Network
 
@@ -62,10 +62,3 @@ You can then evaluate its success on testing data:
 If you have matplotlib installed, you can visualize the training and validation curves after training the network:
 
 	deepsurv.plot_log(log)
-
-## Running Experiments
-
-Experiments are run using Docker containers built off of the [floydhub](https://github.com/floydhub/dl-docker) deep learning Docker images. DeepSurv can be run on either the CPU or the GPU with nvidia-docker. 
-
-To run an experiment, define the experiment name as an environmental variable `EXPRIMENT`and run the docker-compose file. 	
-	
