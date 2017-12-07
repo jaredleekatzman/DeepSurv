@@ -16,7 +16,7 @@ CMD [ "python", "-u", "/scripts/deepsurv_run.py", \
 "gbsg", \
 "/models/gbsg_selu_adam_model_0.json", \
 "--update_fn","adam",\
-"/shared/data/gsbg_cancer_train_test.h5", \
+"/shared/data/gbsg_cancer_train_test.h5", \
 "--treatment_idx", "0", \
 "--results_dir", "/shared/results/", \
 "--num_epochs", "1000"]
