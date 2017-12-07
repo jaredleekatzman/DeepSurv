@@ -2,3 +2,10 @@
 *.egg-info
 *.iml
 **/.DS_STORE
+
+# Misc Folders
+.cache/
+
+# Ignore Saving Results
+experiments/results/
+experiments/data/**/logs/
