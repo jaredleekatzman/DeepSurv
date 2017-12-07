@@ -159,8 +159,8 @@ if __name__ == '__main__':
             trt_idx = args.treatment_idx)
 
     if args.results_dir:
-        _, model = os.path.split(args.model)
-        output_file = os.path.join(args.results_dir,"models") + model + str(uuid.uuid4()) + ".h5"
+        _, model_str = os.path.split(args.model)
+        output_file = os.path.join(args.results_dir,"models") + model_str + str(uuid.uuid4()) + ".h5"
         print("Saving model parameters to output file", output_file)
         save_model(model, output_file)
 
