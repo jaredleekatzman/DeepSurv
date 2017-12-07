@@ -1,6 +1,7 @@
-h5py==2.7.0
-lifelines==0.9.4
+h5py>=2.7.0
+lifelines>=0.9.4
 logger==1.4
-Optunity==1.1.1
-tensorboard_logger==0.0.3
+Optunity>=1.1.1
+tensorboard_logger>=0.0.3
 lasagne==0.2.dev1
+theano>=0.8.2
