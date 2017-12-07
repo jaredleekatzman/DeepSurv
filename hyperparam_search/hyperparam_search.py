@@ -90,7 +90,8 @@ def load_dataset(dataset):
 
         # Generate Data
         factory = datasets.SimulatedData(hr_ratio=hr_ratio,
-                average_death=5, end_time=15, 
+                average_death=5, 
+                censor_method = 'observed_p', observed_p = .5,
                 num_features=10, num_var=2,
                 treatment_group=treatment_group)
         ds = factory.generate_data(NUM_EXAMPLES, method=dataset)

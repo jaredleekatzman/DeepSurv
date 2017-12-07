@@ -3,7 +3,8 @@ import numpy as np
 
 class SimulatedData:
     def __init__(self, hr_ratio,
-        average_death = 5, end_time = 15,
+        average_death = 5,
+        censor_mode = 'end_time', end_time = 15, observed_p = None,
         num_features = 10, num_var = 2,
         treatment_group = False):
         """
@@ -18,6 +19,10 @@ class SimulatedData:
             hr_ratio: lambda_max hazard ratio.
             average_death: average death time that is the mean of the
                 Exponentional distribution.
+            censor_mode: the method to calculate whether a patient is censored.
+                Options: ['end_time', 'observed_p']
+                'end_time': requires the parameter end_time, which is used to censor any patient with death_time > end_time
+                'observed_p': requires the parammeter observed_p, which is the percentage of patients with observed death times
             end_time: censoring time that represents an 'end of study'. Any death
                 time greater than end_time will be censored.
             num_features: size of observation vector. Default: 10.
@@ -27,7 +32,9 @@ class SimulatedData:
         """
 
         self.hr_ratio = hr_ratio
+        self.censor_mode = censor_mode
         self.end_time = end_time
+        self.observed_p = observed_p
         self.average_death = average_death
         self.treatment_group = treatment_group
         self.m = int(num_features) + int(treatment_group)
@@ -134,6 +141,13 @@ class SimulatedData:
                 death_time[i] = np.random.exponential(p_death[i])
             else:
                 death_time[i] = np.random.exponential(p_death[i]) / exp(risk[i])
+
+        # If Censor_mode is 'observed_p': then find the end time in which observed_p percent of patients have an observed death
+        if self.censor_mode is 'observed_p':
+            if self.observed_p is None:
+                raise ValueError("Parameter observed_p must be porivded if censor_mode is configured to 'observed_p'")
+            end_time_idx = int(N * self.observed_p)
+            self.end_time = np.sort(death_time.flatten())[end_time_idx]
 
         # Censor anything that is past end time
         censoring = np.ones((N,1))
