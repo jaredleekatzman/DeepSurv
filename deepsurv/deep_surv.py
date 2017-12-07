@@ -133,20 +133,19 @@ class DeepSurv:
         self.restored_update_params = None
 
     def _negative_log_likelihood(self, E, deterministic = False):
-        """Return the negative log-likelihood of the prediction
+        """Return the negative average log-likelihood of the prediction
             of this model under a given target distribution.
 
         .. math::
 
-            \sum_{i \in D}[F(x_i,\theta) - log(\sum_{j \in R_i} e^{F(x_j,\theta)})]
+            \frac{1}{N_D} \sum_{i \in D}[F(x_i,\theta) - log(\sum_{j \in R_i} e^F(x_j,\theta))]
                 - \lambda P(\theta)
 
         where:
             D is the set of observed events
+            N_D is the number of observed events
             R_i is the set of examples that are still alive at time of death t_j
             F(x,\theta) = log hazard rate
-            P(\theta) = regularization equation
-            \lamba = regularization coefficient
 
         Note: We assume that there are no tied event times
 
@@ -165,7 +164,8 @@ class DeepSurv:
         log_risk = T.log(T.extra_ops.cumsum(hazard_ratio))
         uncensored_likelihood = risk.T - log_risk
         censored_likelihood = uncensored_likelihood * E
-        neg_likelihood = -T.sum(censored_likelihood)
+        num_observed_events = T.sum(E)
+        neg_likelihood = -T.sum(censored_likelihood) / num_observed_events
         return neg_likelihood
 
     def _get_loss_updates(self,
