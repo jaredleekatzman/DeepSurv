@@ -1,4 +1,4 @@
-FROM floydhub/dl-docker:cpu
+FROM floydhub/dl-docker:gpu
 
 RUN pip install https://github.com/Lasagne/Lasagne/archive/master.zip
 RUN \
@@ -12,11 +12,13 @@ RUN \
 
 COPY . /
 
+ENV THEANO_FLAGS=device=gpu7
+
 CMD [ "python", "-u", "/hyperparam_search.py", \
 "/shared/logs", \
 "gaussian", \
 "/box_constraints.0.json", \
-"100", \
+"50", \
 "--update_fn", "adam", \
 "--num_epochs", "500", \
 "--num_fold", "3" ]
