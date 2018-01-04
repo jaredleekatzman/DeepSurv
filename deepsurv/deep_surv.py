@@ -138,7 +138,7 @@ class DeepSurv:
 
         .. math::
 
-            \sum_{i \in D}[F(x_i,\theta) - log(\sum_{j \in R_i} e^F(x_j,\theta))]
+            \sum_{i \in D}[F(x_i,\theta) - log(\sum_{j \in R_i} e^{F(x_j,\theta)})]
                 - \lambda P(\theta)
 
         where:
