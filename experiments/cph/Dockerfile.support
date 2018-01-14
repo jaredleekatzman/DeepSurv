@@ -1,6 +1,4 @@
-ARG device
-
-FROM floydhub/dl-docker:$device
+FROM floydhub/dl-docker:cpu
 
 RUN \
   echo "h5py==2.7.0\n\
