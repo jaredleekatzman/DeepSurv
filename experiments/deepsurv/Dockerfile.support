@@ -14,7 +14,7 @@ RUN \
 COPY . /
 
 CMD [ "python", "-u", "/scripts/deepsurv_run.py", "support", \
-"/models/support_selu_model_adam_0.json", \
+"/models/support_model_selu_revision.0.json", \
 "/shared/data/support_train_test.h5", \
 "--update_fn", "adam", \
 "--results_dir", "/shared/results/", \

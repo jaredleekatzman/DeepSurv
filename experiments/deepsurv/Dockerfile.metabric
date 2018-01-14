@@ -15,8 +15,8 @@ COPY . /
 
 CMD [ "python", "-u", "/scripts/deepsurv_run.py", \
 "metabric", \
-"/models/metabric_IHC4_clinical_adam_0.json", \
+"/models/metabric_model_selu_revision.0.json", \
 "/shared/data/metabric_IHC4_clinical_train_test.h5", \
 "--update_fn", "adam", \
 "--results_dir", "/shared/results/", \
-"--num_epochs", "1500"]
+"--num_epochs", "500"]

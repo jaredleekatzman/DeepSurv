@@ -14,7 +14,7 @@ RUN \
 COPY . /
 
 CMD [ "python", "-u", "/scripts/deepsurv_run.py", "whas", \
-"/models/whas_model_selu_0.json", \
+"/models/whas_model_selu_revision.0.json", \
 "/shared/data/whas_train_test.h5", \
 "--update_fn", "adam", \
 "--results_dir", "/shared/results/", \
