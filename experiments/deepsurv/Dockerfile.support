@@ -7,13 +7,14 @@ RUN \
         lifelines==0.9.4\n\
         logger==1.4\n\
         tensorboard-logger==0.0.3\n\
+        numpy>=1.9.0\n\
         matplotlib==2.0.0" > /requirements.txt && \
   pip install -r /requirements.txt
 
 COPY . /
 
 CMD [ "python", "-u", "/scripts/deepsurv_run.py", "support", \
-"/models/support_selu_model_adam_0.json", \
+"/models/support_model_selu_revision.0.json", \
 "/shared/data/support_train_test.h5", \
 "--update_fn", "adam", \
 "--results_dir", "/shared/results/", \

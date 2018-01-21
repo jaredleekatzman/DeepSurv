@@ -8,8 +8,6 @@ RUN \
         matplotlib==2.0.0" > /requirements.txt && \
   pip install -r /requirements.txt
 
-RUN pip install -r /requirements.txt
-
 COPY . /
 
 CMD [ "python", "-u", "/scripts/cph_run.py", \

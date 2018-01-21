@@ -112,6 +112,8 @@ if __name__ == '__main__':
         }
 
     # Train Model
+
+    # TODO standardize location of logs + results => have them go into same directory with same UUID of experiment
     tensor_log_dir = "/shared/data/logs/tensorboard_" + str(args.dataset) + "_" + str(uuid.uuid4())
     logger = TensorboardLogger("experiments.deep_surv", tensor_log_dir, update_freq = 10)
     model = deep_surv.load_model_from_json(args.model, args.weights)
