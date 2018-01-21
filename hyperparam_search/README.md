@@ -9,7 +9,7 @@ The box constraints is a json file containing a dictionary mapping the hyper-par
 
 The dockerfile needs to be configured with the following details:
 
-1. The experiment name or dataset
+1. The location of the dataset file
 2. The box constraints file to use
 
 Any other parameters to the script are optional and are documented in hyperparam_search.py.
