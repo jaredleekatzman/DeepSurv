@@ -62,7 +62,10 @@ class TestDeepSurvTrain():
 
     def test_train(self):
         # Test if network has undefined parameters
-        assert self.log.has_key('best_params') == True
+        if sys.version_info.major == 2
+            assert self.log.has_key('best_params') == True
+        else:
+            assert 'best_params' in self.log.keys()
         params_is_nan = [is_nan for params in self.log['best_params'] for is_nan in numpy.isnan(params.flatten())]
         assert numpy.any(params_is_nan) == False
 
