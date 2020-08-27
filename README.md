@@ -8,6 +8,8 @@ DeepSurv can be used in numerous survival analysis applications. One medical app
 
 For more details, see full paper [DeepSurv: Personalized Treatment Recommender System Using A Cox Proportional Hazards Deep Neural Network](http://arxiv.org/abs/1606.00931).
 
+**For an updated implementation of the [Cox loss function](https://github.com/runopti/stg/blob/master/python/stg/losses.py) in PyTorch, please see [Feature Selection using Stochastic Gates (STG) by Yamada et al.](https://github.com/runopti/stg/tree/master/python).**
+
 ## Installation:
 
 ### From source
